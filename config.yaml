@@ -1,0 +1,33 @@
+# TODO: Актуализируйте параметры конфигурации под ваш проект
+
+# Окружение (local, dev, prod)
+ENV: local
+
+# Адрес сервера
+address: 0.0.0.0:8080
+
+# Таймаут для HTTP запросов
+server_timeout: 30s
+
+# TODO: Настройки базы данных - укажите параметры подключения к вашей БД
+dbUrl: mongodb://localhost:27017
+db_name: template_service
+db_max_connections: 100
+
+# JWT авторизация для внешнего API (бот)
+# TODO: Укажите учетные данные вашего бота
+bot_auth_name: bot_username
+bot_auth_password: bot_password
+bot_login_url: https://example.com/api/auth/login
+bot_refresh_token_url: https://example.com/api/auth/refresh
+
+# External API Base URL
+# TODO: Укажите базовый URL вашего внешнего API
+external_api_base_url: https://api.example.com
+
+# TODO: Добавьте дополнительные параметры конфигурации здесь
+# Примеры:
+# api_key: your_api_key
+# retry_count: 3
+# batch_size: 100
+
