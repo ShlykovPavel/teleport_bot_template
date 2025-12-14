@@ -17,7 +17,7 @@ import (
 
 // DbConnect устанавливает соединение с MongoDB и возвращает клиент
 // TODO: Замените на свою БД если используете PostgreSQL, MySQL и т.д.
-func DbConnect(dbUri, username, password string, maxConnectionPoolSize uint64) (*mongo.Client, error) {
+func MongoDbConnect(dbUri, username, password string, maxConnectionPoolSize uint64) (*mongo.Client, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()

@@ -1,0 +1,114 @@
+package db_connections
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"template-external-api-service/internal/config"
+	"template-external-api-service/metrics"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func PostgreDbConnect(config *config.DbConfig, log *slog.Logger) (*pgx.Conn, error) {
+	const op = "database/DbConnect"
+	log = slog.With(
+		slog.String("op", op),
+		slog.String("host", config.DbHost),
+		slog.String("port", config.DbPort),
+		slog.String("db_name", config.DbName),
+	)
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", config.DbUser, config.DbPassword, config.DbHost, config.DbPort, config.DbName)
+
+	const retryCount = 5
+	const retryDelay = 5 * time.Second
+
+	var conn *pgx.Conn
+	var err error
+
+	for i := 1; i <= retryCount; i++ {
+		//Ставим таймаут операции, после которого функция завершится с ошибкой
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		//Попытка соединения
+		conn, err = pgx.Connect(ctx, connStr)
+		//Закрываем наш контекст, что б освободить ресурсы
+		cancel()
+
+		if err == nil {
+			log.Info("Successfully connected with pgx!")
+			return conn, nil
+		}
+
+		log.Error("connect users_db failed", "err", err.Error())
+		if i < retryCount {
+			log.Info(fmt.Sprintf("Retrying in %v... (attempt %d/%d)", retryDelay, i+1, retryCount))
+			time.Sleep(retryDelay)
+		}
+
+	}
+	return nil, err
+}
+
+func CreatePool(ctx context.Context, config *config.DbConfig, logger *slog.Logger) (*pgxpool.Pool, error) {
+	const op = "database/CreatePool"
+	logger = logger.With(
+		slog.String("op", op),
+		slog.String("host", config.DbHost),
+		slog.String("port", config.DbPort),
+		slog.String("db_name", config.DbName),
+	)
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", config.DbUser, config.DbPassword, config.DbHost, config.DbPort, config.DbName)
+
+	connConfig, err := pgxpool.ParseConfig(connStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse pgx config: %w", err)
+	}
+
+	// Настройка параметров пула
+	connConfig.MaxConns = config.DbMaxConnections             // Максимальное количество соединений
+	connConfig.MinConns = config.DbMinConnections             // Минимальное количество соединений
+	connConfig.MaxConnLifetime = config.DbMaxConnLifetime     // Максимальное время жизни соединения
+	connConfig.MaxConnIdleTime = config.DbMaxConnIdleTime     // Время бездействия перед закрытием
+	connConfig.HealthCheckPeriod = config.DbHealthCheckPeriod // Период проверки жизни соединения с БД
+	connConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err = conn.Exec(ctx, "SET TIME ZONE 'UTC'")
+		return err
+	}
+
+	pool, err := pgxpool.NewWithConfig(ctx, connConfig)
+	if err != nil {
+		return nil, fmt.Errorf("create pool failed: %w", err)
+	}
+	logger.Info("Successfully created pool")
+	// Проверка соединения
+	if err := pool.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("ping failed: %w", err)
+	}
+	stats := pool.Stat()
+	logger.Debug("current pool state",
+		slog.Int("max_conns", int(stats.MaxConns())),
+		slog.Int("total_conns", int(stats.TotalConns())),
+		slog.Int("idle_conns", int(stats.IdleConns())),
+		slog.Int("acquired_conns", int(stats.AcquiredConns())),
+	)
+	return pool, nil
+}
+
+func PostgreMonitorPool(ctx context.Context, pool *pgxpool.Pool, metrics *metrics.Metrics) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				stats := pool.Stat()
+				metrics.PgxPoolMaxConns.Set(float64(stats.MaxConns()))
+				metrics.PgxPoolUsedConns.Set(float64(stats.AcquiredConns()))
+				metrics.PgxPoolIdleConns.Set(float64(stats.IdleConns()))
+				time.Sleep(5 * time.Second)
+			}
+		}
+	}()
+}

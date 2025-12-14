@@ -4,13 +4,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Metrics структура для хранения метрик Prometheus
+// Metrics структура с метриками
 type Metrics struct {
 	HttpRequestsTotal   *prometheus.CounterVec
 	HttpRequestDuration *prometheus.HistogramVec
+	PgxPoolMaxConns     prometheus.Gauge
+	PgxPoolUsedConns    prometheus.Gauge
+	PgxPoolIdleConns    prometheus.Gauge
 }
 
-// NewMetrics создает новый набор метрик
+// NewMetrics Создаёт экземпляры метрик из структуры
 func NewMetrics() *Metrics {
 	return &Metrics{
 		HttpRequestsTotal: prometheus.NewCounterVec(
@@ -27,15 +30,37 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"method", "path"},
 		),
+		PgxPoolMaxConns: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "pgxpool_max_connections",
+				Help: "Maximum number of connections in the pool",
+			},
+		),
+		PgxPoolUsedConns: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "pgxpool_used_connections",
+				Help: "Currently used connections in the pool",
+			},
+		),
+		PgxPoolIdleConns: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "pgxpool_idle_connections",
+				Help: "Currently idle connections in the pool",
+			},
+		),
 	}
 }
 
-// InitMetrics инициализирует и регистрирует метрики в Prometheus
+// InitMetrics инициализируем экземпляр структуры метрик
 func InitMetrics() *Metrics {
 	metrics := NewMetrics()
 	prometheus.MustRegister(
 		metrics.HttpRequestsTotal,
 		metrics.HttpRequestDuration,
+		metrics.PgxPoolMaxConns,
+		metrics.PgxPoolUsedConns,
+		metrics.PgxPoolIdleConns,
 	)
 	return metrics
+
 }

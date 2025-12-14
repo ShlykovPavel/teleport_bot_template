@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,16 +10,16 @@ import (
 	"template-external-api-service/internal/storage/database/db_connections"
 	"time"
 
-	auth2 "github.com/ShlykovPavel/JWTAuth/auth"
-	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.mongodb.org/mongo-driver/mongo"
-
 	"template-external-api-service/internal/client"
 	"template-external-api-service/internal/client/teleport_open_api_service"
 	"template-external-api-service/internal/config"
 	"template-external-api-service/internal/server/middlewares"
 	"template-external-api-service/metrics"
+
+	auth2 "github.com/ShlykovPavel/JWTAuth/auth"
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // App структура приложения. Включает в себя все необходимые элементы для запуска приложения.
@@ -28,7 +27,7 @@ type App struct {
 	HTTPServer             *http.Server
 	logger                 *slog.Logger
 	cfg                    *config.Config
-	dbClient               *mongo.Client
+	dbClient               *pgxpool.Pool
 	TeleportOpenAPIService *teleport_open_api_service.TeleportOpenAPIService
 }
 
@@ -38,12 +37,13 @@ func NewApp(logger *slog.Logger, cfg *config.Config) *App {
 	metricsInstance := metrics.InitMetrics()
 	logger.Info("Prometheus metrics initialized")
 
-	DbConn, err := db_connections.DbConnect(cfg.DbConfig.DbUrl, cfg.DbConfig.DbUser, cfg.DbConfig.DbPassword, cfg.DbConfig.DbMaxConnections)
+	poll, err := db_connections.CreatePool(context.Background(), &cfg.DbConfig, logger)
 	if err != nil {
-		log.Fatal("Failed to connect to database", "error", err)
+		logger.Error("Failed to create database pool", "error", err)
+		os.Exit(1)
 	}
-	Db := DbConn.Database(cfg.DbConfig.DbName)
-	logger.Info("Database connected", slog.String("db_name", Db.Name()))
+
+	db_connections.PostgreMonitorPool(context.Background(), poll, metricsInstance)
 
 	// TODO: Инициализация репозиториев
 	// Пример:
@@ -91,7 +91,7 @@ func NewApp(logger *slog.Logger, cfg *config.Config) *App {
 	// myHandler := handlers.NewMyHandler(myService, logger)
 
 	// Инициализация Middleware
-	middleware := middlewares.NewMiddlewares(logger, metricsInstance)
+	middleware := middlewares.NewMiddlewares(logger, cfg, metricsInstance)
 
 	// Настройка Gin роутера
 	if cfg.Env == "prod" {
@@ -183,7 +183,7 @@ func NewApp(logger *slog.Logger, cfg *config.Config) *App {
 		cfg:                    cfg,
 		logger:                 logger,
 		HTTPServer:             srv,
-		dbClient:               DbConn,
+		dbClient:               poll,
 		TeleportOpenAPIService: teleportOpenAPIService,
 	}
 }
@@ -215,9 +215,8 @@ func (a *App) Run() {
 		os.Exit(1)
 	}
 
-	if err := db_connections.DbDisconnect(a.dbClient); err != nil {
-		a.logger.Error("Failed to disconnect from database", "error", err)
-	}
+	a.dbClient.Close()
+	a.logger.Info("Disconnected from database")
 
 	a.logger.Info("Server stopped")
 }

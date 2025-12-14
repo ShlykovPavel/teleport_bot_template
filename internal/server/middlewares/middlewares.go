@@ -22,14 +22,15 @@ type Middlewares struct {
 }
 
 // NewMiddlewares создает новый набор middleware
-func NewMiddlewares(logger *slog.Logger, metrics *metrics.Metrics) *Middlewares {
+func NewMiddlewares(logger *slog.Logger, config *config.Config, metrics *metrics.Metrics) *Middlewares {
 	return &Middlewares{
 		logger:  logger,
+		config:  config,
 		metrics: metrics,
 	}
 }
 
-// MetricsMiddleware отслеживает метрики HTTP запросов
+// MetricsMiddleware отслеживает метрики HTTP запросов для Prometheus/Grafana
 func (m *Middlewares) MetricsMiddleware(c *gin.Context) {
 	start := time.Now()
 	path := c.FullPath()
@@ -40,11 +41,14 @@ func (m *Middlewares) MetricsMiddleware(c *gin.Context) {
 
 	c.Next()
 
-	duration := time.Since(start).Seconds()
-	status := strconv.Itoa(c.Writer.Status())
+	// Пропускаем сбор метрик для самого endpoint метрик
+	if path != "/metrics" && path != "/api/v1/metrics" {
+		status := strconv.Itoa(c.Writer.Status())
+		duration := time.Since(start).Seconds()
 
-	m.metrics.HttpRequestsTotal.WithLabelValues(method, path, status).Inc()
-	m.metrics.HttpRequestDuration.WithLabelValues(method, path).Observe(duration)
+		m.metrics.HttpRequestsTotal.WithLabelValues(method, path, status).Inc()
+		m.metrics.HttpRequestDuration.WithLabelValues(method, path).Observe(duration)
+	}
 }
 
 func (m *Middlewares) AuthMiddleware(c *gin.Context) {
