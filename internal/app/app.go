@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"template-external-api-service/internal/storage/database/db_connections"
 	"time"
 
 	auth2 "github.com/ShlykovPavel/JWTAuth/auth"
@@ -19,7 +20,6 @@ import (
 	"template-external-api-service/internal/client/external_api_service"
 	"template-external-api-service/internal/config"
 	"template-external-api-service/internal/server/middlewares"
-	"template-external-api-service/internal/storage/database"
 	"template-external-api-service/metrics"
 )
 
@@ -38,21 +38,11 @@ func NewApp(logger *slog.Logger, cfg *config.Config) *App {
 	metricsInstance := metrics.InitMetrics()
 	logger.Info("Prometheus metrics initialized")
 
-	// TODO: Подключение к базе данных
-	// Раскомментируйте когда будете готовы использовать БД
-	dbConfig := database.DbConfig{
-		DbUser:           cfg.DbUser,
-		DbPassword:       cfg.DbPassword,
-		DbHost:           cfg.DbUrl,
-		DbMaxConnections: cfg.DbMaxConnections,
-		DbName:           cfg.DbName,
-	}
-
-	DbConn, err := database.DbConnect(dbConfig.DbHost, dbConfig.DbUser, dbConfig.DbPassword, dbConfig.DbMaxConnections)
+	DbConn, err := db_connections.DbConnect(cfg.DbConfig.DbUrl, cfg.DbConfig.DbUser, cfg.DbConfig.DbPassword, cfg.DbConfig.DbMaxConnections)
 	if err != nil {
 		log.Fatal("Failed to connect to database", "error", err)
 	}
-	Db := DbConn.Database(dbConfig.DbName)
+	Db := DbConn.Database(cfg.DbConfig.DbName)
 	logger.Info("Database connected", slog.String("db_name", Db.Name()))
 
 	// TODO: Инициализация репозиториев
@@ -61,10 +51,10 @@ func NewApp(logger *slog.Logger, cfg *config.Config) *App {
 
 	// Авторизация за бота в внешнем API
 	botAuth := auth2.NewJwtAuth(
-		cfg.BotLoginUrl,
-		cfg.BotRefreshTokenUrl,
-		cfg.BotAuthName,
-		cfg.BotAuthPassword,
+		cfg.TeleportConfig.BotLoginUrl,
+		cfg.TeleportConfig.BotRefreshTokenUrl,
+		cfg.TeleportConfig.BotAuthName,
+		cfg.TeleportConfig.BotAuthPassword,
 		10,
 		logger,
 	)
@@ -82,7 +72,7 @@ func NewApp(logger *slog.Logger, cfg *config.Config) *App {
 
 	// Инициализация HTTP клиента с JWT авторизацией
 	httpClient := client.NewHTTPClient(client.ClientConfig{
-		BaseURL: cfg.ExternalAPIBaseURL,
+		BaseURL: cfg.TeleportConfig.TeleportAPIBaseURL,
 		Timeout: cfg.ServerTimeout,
 		JwtAuth: botAuth,
 		Logger:  logger,
@@ -112,7 +102,6 @@ func NewApp(logger *slog.Logger, cfg *config.Config) *App {
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
 	router.Use(middleware.MetricsMiddleware)
-	router.Use(middleware.CORSMiddleware)
 
 	// Health check endpoint
 	router.GET("/health", func(c *gin.Context) {
@@ -226,7 +215,7 @@ func (a *App) Run() {
 		os.Exit(1)
 	}
 
-	if err := database.DbDisconnect(a.dbClient); err != nil {
+	if err := db_connections.DbDisconnect(a.dbClient); err != nil {
 		a.logger.Error("Failed to disconnect from database", "error", err)
 	}
 

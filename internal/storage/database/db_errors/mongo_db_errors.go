@@ -1,4 +1,4 @@
-package db_errors
+package mongo_db_errors
 
 import (
 	"context"

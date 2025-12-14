@@ -1,4 +1,4 @@
-package database
+package db_connections
 
 import (
 	"context"
@@ -14,15 +14,6 @@ import (
 // TODO: Добавьте здесь свою БД
 // Этот файл содержит пример подключения к MongoDB.
 // Вы можете заменить его на PostgreSQL, MySQL или другую БД по необходимости.
-
-// DbConfig конфигурация для подключения к БД
-type DbConfig struct {
-	DbName           string
-	DbUser           string
-	DbPassword       string
-	DbHost           string
-	DbMaxConnections uint64
-}
 
 // DbConnect устанавливает соединение с MongoDB и возвращает клиент
 // TODO: Замените на свою БД если используете PostgreSQL, MySQL и т.д.

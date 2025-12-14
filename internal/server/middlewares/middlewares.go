@@ -2,7 +2,11 @@ package middlewares
 
 import (
 	"log/slog"
+	"net/http"
 	"strconv"
+	"strings"
+	"template-external-api-service/internal/config"
+	jwtTokens "template-external-api-service/internal/lib/jwt_tokens"
 	"time"
 
 	"template-external-api-service/metrics"
@@ -13,7 +17,10 @@ import (
 // Middlewares структура для middleware компонентов
 type Middlewares struct {
 	logger  *slog.Logger
+	config  *config.Config
 	metrics *metrics.Metrics
+	// TODO Добавьте репозитория который соответствует выбранной БД
+	tokenRepo repositoires.TokensRepository
 }
 
 // NewMiddlewares создает новый набор middleware
@@ -42,24 +49,45 @@ func (m *Middlewares) MetricsMiddleware(c *gin.Context) {
 	m.metrics.HttpRequestDuration.WithLabelValues(method, path).Observe(duration)
 }
 
-// CORSMiddleware добавляет CORS заголовки
-func (m *Middlewares) CORSMiddleware(c *gin.Context) {
-	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-	c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-	c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, X-API-KEY")
-	c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
+func (m *Middlewares) AuthMiddleware(c *gin.Context) {
+	token := c.GetHeader("Authorization")
+	m.logger.Debug("AuthMiddleware", slog.String("token", token))
 
-	if c.Request.Method == "OPTIONS" {
-		c.AbortWithStatus(204)
+	const bearerPrefix = "Bearer "
+	if !strings.HasPrefix(token, bearerPrefix) {
+		m.logger.Warn("AuthMiddleware: Missing Bearer prefix")
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
 
+	tokenString := strings.TrimPrefix(token, bearerPrefix)
+
+	_, err := jwtTokens.VerifyToken(tokenString, m.config.BotConfig.JWTSecretKey)
+	if err != nil {
+		m.logger.Error("AuthMiddleware", slog.String("error", err.Error()))
+		c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
 	c.Next()
+
 }
 
-// TODO: Добавьте здесь свои middleware по необходимости
-// Примеры:
-// - AuthMiddleware для JWT авторизации
-// - APIKeyMiddleware для проверки API ключей
-// - RateLimitMiddleware для ограничения запросов
-// - LoggingMiddleware для детального логирования
+// APIKeyMiddleware проверяет API ключ для webhook endpoints
+func (m *Middlewares) APIKeyMiddleware(c *gin.Context) {
+	apiKey := c.GetHeader("X-API-KEY")
+
+	if apiKey == "" {
+		m.logger.Warn("APIKeyMiddleware: Missing API key")
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing API key"})
+		return
+	}
+
+	if apiKey != m.config.BotConfig.WebHookAPIKey {
+		m.logger.Warn("APIKeyMiddleware: Invalid API key", slog.String("provided_key", apiKey))
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid API key"})
+		return
+	}
+
+	m.logger.Debug("APIKeyMiddleware: API key validated successfully")
+	c.Next()
+}

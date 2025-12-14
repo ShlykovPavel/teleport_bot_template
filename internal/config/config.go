@@ -13,25 +13,12 @@ import (
 // Config представляет конфигурацию приложения
 type Config struct {
 	// Основные параметры приложения
-	Env           string        `yaml:"ENV" env:"ENV" env-default:"local"`
-	Address       string        `yaml:"address" env:"ADDRESS" env-default:"0.0.0.0:8080"`
-	ServerTimeout time.Duration `yaml:"server_timeout" env:"SERVER_TIMEOUT" env-default:"30s"`
-
-	// TODO: Настройки базы данных - актуализируйте под вашу БД (MongoDB, PostgreSQL, MySQL и т.д.)
-	DbUrl            string `yaml:"dbUrl" env:"DB_URL" env-required:"true"`
-	DbName           string `yaml:"db_name" env:"DB_NAME" env-required:"true"`
-	DbUser           string `yaml:"db_user" env:"DB_USER"`
-	DbPassword       string `yaml:"db_password" env:"DB_PASSWORD"`
-	DbMaxConnections uint64 `yaml:"db_max_connections" env:"DB_MAX_CONNECTIONS" env-default:"100"`
-
-	// JWT авторизация для внешнего API (бот)
-	BotAuthName        string `yaml:"bot_auth_name" env:"BOT_AUTH_NAME" env-required:"true"`
-	BotAuthPassword    string `yaml:"bot_auth_password" env:"BOT_AUTH_PASSWORD" env-required:"true"`
-	BotLoginUrl        string `yaml:"bot_login_url" env:"BOT_LOGIN_URL" env-required:"true"`
-	BotRefreshTokenUrl string `yaml:"bot_refresh_token_url" env:"BOT_REFRESH_TOKEN_URL" env-required:"true"`
-
-	// External API
-	ExternalAPIBaseURL string `yaml:"external_api_base_url" env:"EXTERNAL_API_BASE_URL" env-required:"true"`
+	Env            string         `yaml:"ENV" env:"ENV" env-default:"local"`
+	Address        string         `yaml:"address" env:"ADDRESS" env-default:"0.0.0.0:8080"`
+	ServerTimeout  time.Duration  `yaml:"server_timeout" env:"SERVER_TIMEOUT" env-default:"30s"`
+	DbConfig       DbConfig       `yaml:"db_config" env:"DB_CONFIG"`
+	TeleportConfig TeleportConfig `yaml:"teleport_config" env:"TELEPORT_CONFIG"`
+	BotConfig      BotConfig      `yaml:"bot_config" env:"BOT_CONFIG"`
 
 	// TODO: Добавьте здесь дополнительные параметры конфигурации для вашего сервиса
 	// Примеры:
