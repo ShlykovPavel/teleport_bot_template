@@ -19,8 +19,6 @@ type Middlewares struct {
 	logger  *slog.Logger
 	config  *config.Config
 	metrics *metrics.Metrics
-	// TODO Добавьте репозитория который соответствует выбранной БД
-	tokenRepo repositoires.TokensRepository
 }
 
 // NewMiddlewares создает новый набор middleware

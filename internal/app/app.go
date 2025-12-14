@@ -17,7 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"template-external-api-service/internal/client"
-	"template-external-api-service/internal/client/external_api_service"
+	"template-external-api-service/internal/client/teleport_open_api_service"
 	"template-external-api-service/internal/config"
 	"template-external-api-service/internal/server/middlewares"
 	"template-external-api-service/metrics"
@@ -25,11 +25,11 @@ import (
 
 // App структура приложения. Включает в себя все необходимые элементы для запуска приложения.
 type App struct {
-	HTTPServer         *http.Server
-	logger             *slog.Logger
-	cfg                *config.Config
-	dbClient           *mongo.Client
-	externalAPIService external_api_service.ExternalAPIServiceInterface
+	HTTPServer             *http.Server
+	logger                 *slog.Logger
+	cfg                    *config.Config
+	dbClient               *mongo.Client
+	TeleportOpenAPIService *teleport_open_api_service.TeleportOpenAPIService
 }
 
 // NewApp создаёт экземпляр приложения, инициализируя все зависимости
@@ -79,8 +79,8 @@ func NewApp(logger *slog.Logger, cfg *config.Config) *App {
 	})
 
 	// Сервис для взаимодействия с внешним API
-	externalAPIService := external_api_service.NewExternalAPIService(httpClient, logger)
-	logger.Info("External API service initialized successfully")
+	teleportOpenAPIService := teleport_open_api_service.NewTeleportOpenAPIService(httpClient, logger)
+	logger.Info("Teleport OpenAPI Service initialized successfully")
 
 	// TODO: Инициализация ваших сервисов
 	// Пример:
@@ -128,7 +128,7 @@ func NewApp(logger *slog.Logger, cfg *config.Config) *App {
 			defer cancel()
 
 			// Получаем информацию о заявке через External API
-			demandInfo, err := externalAPIService.GetDemandInfo(ctx, demandID)
+			demandInfo, err := teleportOpenAPIService.GetDemandInfo(ctx, demandID)
 			if err != nil {
 				logger.Error("Failed to get demand info",
 					slog.String("demand_id", demandID),
@@ -148,7 +148,7 @@ func NewApp(logger *slog.Logger, cfg *config.Config) *App {
 			defer cancel()
 
 			// Получаем информацию об аккаунте через External API
-			accountInfo, err := externalAPIService.GetAccountInfo(ctx, accountID)
+			accountInfo, err := teleportOpenAPIService.GetAccountInfo(ctx, accountID)
 			if err != nil {
 				logger.Error("Failed to get account info",
 					slog.String("account_id", accountID),
@@ -180,11 +180,11 @@ func NewApp(logger *slog.Logger, cfg *config.Config) *App {
 	}
 
 	return &App{
-		cfg:                cfg,
-		logger:             logger,
-		HTTPServer:         srv,
-		dbClient:           DbConn,
-		externalAPIService: externalAPIService,
+		cfg:                    cfg,
+		logger:                 logger,
+		HTTPServer:             srv,
+		dbClient:               DbConn,
+		TeleportOpenAPIService: teleportOpenAPIService,
 	}
 }
 

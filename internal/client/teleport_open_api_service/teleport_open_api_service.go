@@ -1,29 +1,29 @@
-package external_api_service
+package teleport_open_api_service
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
 	"template-external-api-service/internal/client"
-	"template-external-api-service/internal/client/external_api_service/models"
+	"template-external-api-service/internal/client/teleport_open_api_service/models"
 )
 
-// ExternalAPIServiceInterface интерфейс для работы с внешним API
-type ExternalAPIServiceInterface interface {
+// TeleportOpenAPIServiceInterface интерфейс для работы с внешним API
+type TeleportOpenAPIServiceInterface interface {
 	UpdateDemandStatus(ctx context.Context, demandID string, status string) (*DemandStatusResponse, error)
 	GetDemandInfo(ctx context.Context, demandID string) (*models.DemandInfoResponse, error)
 	GetAccountInfo(ctx context.Context, userID string) (*models.AccountInfoResponse, error)
 }
 
-// ExternalAPIService сервис для работы с внешним API
-type ExternalAPIService struct {
+// TeleportOpenAPIService сервис для работы с внешним API
+type TeleportOpenAPIService struct {
 	client client.HTTPClient
 	logger *slog.Logger
 }
 
 // NewExternalAPIService создает новый сервис для работы с внешним API
-func NewExternalAPIService(client client.HTTPClient, logger *slog.Logger) *ExternalAPIService {
-	return &ExternalAPIService{
+func NewTeleportOpenAPIService(client client.HTTPClient, logger *slog.Logger) *TeleportOpenAPIService {
+	return &TeleportOpenAPIService{
 		client: client,
 		logger: logger,
 	}
@@ -43,7 +43,7 @@ type DemandStatusResponse struct {
 }
 
 // UpdateDemandStatus обновляет статус заявки через PATCH запрос
-func (s *ExternalAPIService) UpdateDemandStatus(ctx context.Context, demandID string, status string) (*DemandStatusResponse, error) {
+func (s *TeleportOpenAPIService) UpdateDemandStatus(ctx context.Context, demandID string, status string) (*DemandStatusResponse, error) {
 	s.logger.Info("Updating demand status",
 		slog.String("demand_id", demandID),
 		slog.String("status", status))
@@ -105,7 +105,7 @@ func (s *ExternalAPIService) UpdateDemandStatus(ctx context.Context, demandID st
 }
 
 // GetDemandInfo получает информацию о заявке
-func (s *ExternalAPIService) GetDemandInfo(ctx context.Context, demandID string) (*models.DemandInfoResponse, error) {
+func (s *TeleportOpenAPIService) GetDemandInfo(ctx context.Context, demandID string) (*models.DemandInfoResponse, error) {
 	s.logger.Info("Getting demand info", slog.String("demand_id", demandID))
 
 	resp, err := s.client.Get(ctx, fmt.Sprintf("/api/open/demands/%s", demandID))
@@ -150,7 +150,7 @@ func (s *ExternalAPIService) GetDemandInfo(ctx context.Context, demandID string)
 }
 
 // GetAccountInfo получает информацию об аккаунте
-func (s *ExternalAPIService) GetAccountInfo(ctx context.Context, userId string) (*models.AccountInfoResponse, error) {
+func (s *TeleportOpenAPIService) GetAccountInfo(ctx context.Context, userId string) (*models.AccountInfoResponse, error) {
 	s.logger.Info("Getting account info", slog.String("user_id", userId))
 
 	resp, err := s.client.Get(ctx, fmt.Sprintf("/api/open/accounts/%s", userId))
